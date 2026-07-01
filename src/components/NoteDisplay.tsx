@@ -38,12 +38,12 @@ export function NoteDisplay({ pitch, targetNoteName }: Props) {
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 8,
   },
   target: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#888',
-    marginBottom: 4,
+    marginBottom: 2,
     letterSpacing: 1,
   },
   noteRow: {
@@ -51,27 +51,27 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   noteName: {
-    fontSize: 80,
+    fontSize: 56,
     fontWeight: '700',
     color: '#fff',
-    lineHeight: 88,
+    lineHeight: 64,
   },
   octave: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: '400',
     color: '#aaa',
-    marginTop: 12,
+    marginTop: 8,
     marginLeft: 4,
   },
   hz: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#888',
-    marginTop: 4,
+    marginTop: 2,
   },
   cents: {
-    fontSize: 22,
+    fontSize: 20,
     color: '#ccc',
-    marginTop: 8,
+    marginTop: 4,
     fontVariant: ['tabular-nums'],
   },
   inTune: {

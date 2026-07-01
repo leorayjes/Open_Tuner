@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  ScrollView,
   Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -61,55 +62,61 @@ export default function TunerScreen() {
     <SafeAreaView style={styles.root}>
       <InTuneFlash isInTune={pitch.isInTune} />
 
-      <View style={styles.header}>
-        <Text style={styles.tuningName}>{activeTuning?.name ?? 'No tuning selected'}</Text>
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <View style={styles.header}>
+          <Text style={styles.tuningName}>{activeTuning?.name ?? 'No tuning selected'}</Text>
+        </View>
 
-      {/* needleWrapper centers the fixed-width TunerNeedle in the full-width column */}
-      <View style={styles.needleWrapper}>
-        <TunerNeedle cents={pitch.centsDeviation} size={280} />
-      </View>
+        {/* needleWrapper centers the fixed-width TunerNeedle in the full-width column */}
+        <View style={styles.needleWrapper}>
+          <TunerNeedle cents={pitch.centsDeviation} size={260} />
+        </View>
 
-      <View style={styles.meterRow}>
-        <CentsMeter cents={pitch.centsDeviation} />
-      </View>
+        <View style={styles.meterRow}>
+          <CentsMeter cents={pitch.centsDeviation} />
+        </View>
 
-      <NoteDisplay pitch={pitch} targetNoteName={targetLabel} />
+        <NoteDisplay pitch={pitch} targetNoteName={targetLabel} />
 
-      {activeTuning && (
-        <StringSelector
-          strings={activeTuning.strings}
-          selectedIndex={selectedString}
-          onSelect={setSelectedString}
-        />
-      )}
+        {activeTuning && (
+          <StringSelector
+            strings={activeTuning.strings}
+            selectedIndex={selectedString}
+            onSelect={setSelectedString}
+          />
+        )}
 
-      <View style={styles.buttonRow}>
-        {/* Microphone toggle */}
-        <TouchableOpacity
-          style={[styles.listenBtn, active && styles.listenBtnActive]}
-          onPress={handleToggle}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.micDot, active && styles.micDotActive]} />
-          <Text style={styles.listenText}>
-            {active ? 'Listening...' : 'Tap to Listen'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.buttonRow}>
+          {/* Microphone toggle */}
+          <TouchableOpacity
+            style={[styles.listenBtn, active && styles.listenBtnActive]}
+            onPress={handleToggle}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.micDot, active && styles.micDotActive]} />
+            <Text style={styles.listenText}>
+              {active ? 'Listening...' : 'Tap to Listen'}
+            </Text>
+          </TouchableOpacity>
 
-        {/* Reference drone toggle */}
-        <TouchableOpacity
-          style={[styles.droneBtn, isDroning && styles.droneBtnActive]}
-          onPress={toggleDrone}
-          activeOpacity={0.8}
-          disabled={targetNote === undefined}
-        >
-          <View style={[styles.droneDot, isDroning && styles.droneDotActive]} />
-          <Text style={[styles.droneText, isDroning && styles.droneTextActive]}>
-            {isDroning ? 'Reference On' : 'Play Reference'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          {/* Reference drone toggle */}
+          <TouchableOpacity
+            style={[styles.droneBtn, isDroning && styles.droneBtnActive]}
+            onPress={toggleDrone}
+            activeOpacity={0.8}
+            disabled={targetNote === undefined}
+          >
+            <View style={[styles.droneDot, isDroning && styles.droneDotActive]} />
+            <Text style={[styles.droneText, isDroning && styles.droneTextActive]}>
+              {isDroning ? 'Reference On' : 'Play Reference'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -118,6 +125,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#111',
+  },
+  scroll: {
+    flexGrow: 1,
   },
   centered: {
     flex: 1,
