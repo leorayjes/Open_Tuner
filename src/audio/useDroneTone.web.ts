@@ -1,9 +1,12 @@
 /**
  * useDroneTone — Web implementation using the Web Audio API.
  *
- * Creates an OscillatorNode (sine wave) that drones at the target frequency
- * until the user toggles it off.  Frequency updates smoothly when the selected
- * string changes so there is no click or restart.
+ * Uses an AudioBufferSourceNode (looping single-cycle sine wave) instead of
+ * an OscillatorNode.  This avoids the AudioParam scheduling races that caused
+ * the gain to silently stay at 0.
+ *
+ * Each time the target frequency changes while droning, the source is rebuilt
+ * and restarted so the loop always aligns cleanly on phase 0.
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
 
@@ -13,66 +16,67 @@ export interface DroneToneControls {
   stopDrone: () => void;
 }
 
+/** Build a one-cycle sine wave AudioBuffer at the given frequency. */
+function makeSineBuffer(ctx: AudioContext, frequency: number): AudioBuffer {
+  const sampleRate     = ctx.sampleRate;
+  const samplesPerCycle = Math.round(sampleRate / frequency);
+  const buffer         = ctx.createBuffer(1, samplesPerCycle, sampleRate);
+  const channel        = buffer.getChannelData(0);
+  for (let i = 0; i < samplesPerCycle; i++) {
+    channel[i] = Math.sin((2 * Math.PI * i) / samplesPerCycle) * 0.4;
+  }
+  return buffer;
+}
+
+/** The live playback state kept in a ref so we can stop/replace it. */
+interface DroneState {
+  ctx: AudioContext;
+  src: AudioBufferSourceNode;
+  gain: GainNode;
+}
+
 export function useDroneTone(frequency: number | null): DroneToneControls {
   const [isDroning, setIsDroning] = useState(false);
-  const ctxRef  = useRef<AudioContext | null>(null);
-  const oscRef  = useRef<OscillatorNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
+  const droneRef    = useRef<DroneState | null>(null);
+  const activeFreq  = useRef<number | null>(null);
 
+  /** Stop the current source and close the AudioContext. */
   const tearDown = useCallback(() => {
-    try { oscRef.current?.stop(); } catch (_) { /* already stopped */ }
-    oscRef.current?.disconnect();
-    gainRef.current?.disconnect();
-    oscRef.current  = null;
-    gainRef.current = null;
+    if (!droneRef.current) return;
+    const { ctx, src, gain } = droneRef.current;
+    try { src.stop(); } catch (_) { /* already stopped */ }
+    src.disconnect();
+    gain.disconnect();
+    ctx.close().catch(() => {});
+    droneRef.current = null;
+    activeFreq.current = null;
   }, []);
 
   const stopDrone = useCallback(() => {
-    if (gainRef.current && ctxRef.current) {
-      // Ramp gain to 0 over 60 ms to avoid a click, then disconnect
-      const gain = gainRef.current;
-      const t = ctxRef.current.currentTime;
-      gain.gain.setValueAtTime(gain.gain.value, t);
-      gain.gain.linearRampToValueAtTime(0, t + 0.06);
-      setTimeout(tearDown, 150);
-    } else {
-      tearDown();
-    }
+    tearDown();
     setIsDroning(false);
   }, [tearDown]);
 
-  const startDrone = useCallback(async (freq: number) => {
-    // Lazily create the AudioContext inside the user-gesture callback
-    if (!ctxRef.current) ctxRef.current = new AudioContext();
-    const ctx = ctxRef.current;
+  const startDrone = useCallback((freq: number) => {
+    // Replace any existing drone
+    if (droneRef.current) tearDown();
 
-    // resume() returns a Promise — must await so the context is truly running
-    // before we start the oscillator.
-    if (ctx.state !== 'running') await ctx.resume();
-
-    tearDown(); // stop any previous oscillator
-
-    const osc  = ctx.createOscillator();
+    const ctx  = new AudioContext();
+    const buf  = makeSineBuffer(ctx, freq);
+    const src  = ctx.createBufferSource();
     const gain = ctx.createGain();
 
-    osc.type = 'sine';
-    osc.frequency.value = freq;
+    src.buffer = buf;
+    src.loop   = true;
 
-    // Set gain directly (not via the scheduling API) so there is no
-    // scheduling-vs-current-time race that could leave gain stuck at 0.
-    gain.gain.value = 0;
+    gain.gain.value = 0.5;
 
-    osc.connect(gain);
+    src.connect(gain);
     gain.connect(ctx.destination);
-    osc.start();
+    src.start();
 
-    // Ramp gain up after the oscillator has started
-    const t = ctx.currentTime;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.35, t + 0.06);
-
-    oscRef.current  = osc;
-    gainRef.current = gain;
+    droneRef.current  = { ctx, src, gain };
+    activeFreq.current = freq;
     setIsDroning(true);
   }, [tearDown]);
 
@@ -80,22 +84,18 @@ export function useDroneTone(frequency: number | null): DroneToneControls {
     if (isDroning) {
       stopDrone();
     } else if (frequency !== null) {
-      startDrone(frequency).catch(console.error);
+      startDrone(frequency);
     }
   }, [isDroning, frequency, startDrone, stopDrone]);
 
-  // Smoothly slide to the new pitch when the selected string changes mid-drone
+  // Rebuild the source when the selected string changes while droning
   useEffect(() => {
-    if (isDroning && frequency !== null && oscRef.current && ctxRef.current) {
-      oscRef.current.frequency.setTargetAtTime(
-        frequency,
-        ctxRef.current.currentTime,
-        0.05,
-      );
+    if (isDroning && frequency !== null && frequency !== activeFreq.current) {
+      startDrone(frequency);
     }
-  }, [frequency, isDroning]);
+  }, [frequency, isDroning, startDrone]);
 
-  // Release resources on unmount
+  // Clean up on unmount
   useEffect(() => () => tearDown(), [tearDown]);
 
   return { isDroning, toggleDrone, stopDrone };
